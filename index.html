@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数字を読んでみよう</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.1rem;
+      color: #555;
+      margin-bottom: 32px;
+      letter-spacing: 0.05em;
+    }
+
+    #card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      width: 100%;
+      max-width: 480px;
+      padding: 48px 32px 40px;
+      text-align: center;
+      cursor: pointer;
+      user-select: none;
+      transition: box-shadow 0.15s;
+    }
+
+    #card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.14); }
+
+    /* 問題カウンター */
+    #counter {
+      font-size: 0.8rem;
+      color: #ccc;
+      margin-bottom: 8px;
+      min-height: 1.2em;
+    }
+
+    #number-display {
+      font-size: 2.8rem;
+      font-weight: 700;
+      color: #1a3a5c;
+      letter-spacing: 0.04em;
+      min-height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: font-size 0.2s;
+    }
+
+    #countdown {
+      margin-top: 16px;
+      font-size: 0.95rem;
+      color: #aaa;
+      min-height: 24px;
+    }
+
+    #answer-area {
+      margin-top: 20px;
+      min-height: 56px;
+      opacity: 0;
+      transition: opacity 0.5s;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    #answer-area.visible { opacity: 1; }
+
+    #answer-ja {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: #e05a00;
+    }
+
+    #answer-si {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: #fff;
+      background: #1a7a5c;
+      border-radius: 8px;
+      padding: 2px 12px 4px;
+      letter-spacing: 0.03em;
+    }
+
+    #hint-text {
+      margin-top: 20px;
+      font-size: 0.9rem;
+      color: #1a7a5c;
+      background: #edf7f3;
+      border-radius: 10px;
+      padding: 10px 16px;
+      opacity: 0;
+      transition: opacity 0.5s;
+      line-height: 1.6;
+    }
+    #hint-text.visible { opacity: 1; }
+
+    #hint {
+      margin-top: 24px;
+      font-size: 0.85rem;
+      color: #bbb;
+    }
+
+    #start-msg {
+      font-size: 1.1rem;
+      color: #888;
+      padding: 16px 0;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #d0d8e0;
+      margin: 0 3px;
+      transition: background 0.3s;
+    }
+    .dot.active { background: #1a3a5c; }
+
+    /* ── ゴール画面 ── */
+    #goal {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+    }
+
+    #goal-main {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: #1a3a5c;
+      line-height: 1.7;
+    }
+
+    #goal-btn {
+      margin-top: 8px;
+      display: inline-block;
+      background: #f0f4f8;
+      color: #888;
+      font-size: 0.9rem;
+      padding: 10px 24px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    #goal-btn:hover { background: #e2e8f0; color: #555; }
+  </style>
+</head>
+<body>
+
+  <h1>📊 数字を読んでみよう</h1>
+
+  <div id="card" onclick="handleClick()">
+
+    <!-- 問題UI -->
+    <div id="quiz-ui">
+      <div id="counter"></div>
+      <div id="number-display">
+        <span id="start-msg">タップして始める</span>
+      </div>
+      <div id="countdown"></div>
+      <div id="answer-area">
+        <span id="answer-ja"></span>
+        <span id="answer-si"></span>
+      </div>
+      <div id="hint-text"></div>
+      <div id="hint">タップで次の問題へ</div>
+    </div>
+
+    <!-- ゴール画面 -->
+    <div id="goal">
+      <div id="goal-main">🎉 10問クリア！<br>カンマとK・M・G・T、<br>もう怖くない！はず</div>
+      <div id="goal-btn" onclick="resetQuiz(event)">怖い場合はもう一度どうぞ w</div>
+    </div>
+
+  </div>
+
+  <script>
+    // ── 定数・状態 ────────────────────────────
+    const TOTAL = 10;
+    let state = 'idle'; // idle | showing | revealed | done
+    let countdownTimer = null;
+    let currentJa = '', currentSi = '', currentHint = '';
+    let lastDigits = 0;
+    let answered = 0;
+
+    // ── 数値生成 ──────────────────────────────
+    function randomNumber() {
+      // 5〜13桁を均等に選んでから、その桁の範囲で乱数生成
+      let digits, n;
+      do {
+        digits = Math.floor(Math.random() * 9) + 5; // 5〜13桁
+        const min = Math.pow(10, digits - 1);
+        const max = digits === 13
+          ? 9_000_000_000_000        // 上限 9兆
+          : Math.pow(10, digits) - 1;
+        n = Math.floor(Math.random() * (max - min + 1)) + min;
+      } while (digits === lastDigits);
+      lastDigits = digits;
+      return n;
+    }
+
+    // カンマ区切り
+    function formatComma(n) {
+      return n.toLocaleString('ja-JP');
+    }
+
+    // 文字数に応じてフォントサイズ調整
+    function adjustFontSize(text) {
+      const len = text.length;
+      const el = document.getElementById('number-display');
+      if      (len >= 17) el.style.fontSize = '1.85rem';
+      else if (len >= 15) el.style.fontSize = '2.1rem';
+      else if (len >= 12) el.style.fontSize = '2.2rem';
+      else if (len >= 10) el.style.fontSize = '2.5rem';
+      else                el.style.fontSize = '2.8rem';
+    }
+
+    // 日本語読み（兆・億・万 対応）
+    function toJapanese(n) {
+      if (n === 0) return 'ゼロ';
+      const cho  = Math.floor(n / 1_000_000_000_000);
+      const oku  = Math.floor((n % 1_000_000_000_000) / 100_000_000);
+      const man  = Math.floor((n % 100_000_000) / 10_000);
+      const rest = n % 10_000;
+      let r = '';
+      if (cho  > 0) r += cho  + '兆';
+      if (oku  > 0) r += oku  + '億';
+      if (man  > 0) r += man  + '万';
+      if (rest > 0) r += rest;
+      return r;
+    }
+
+    // K / M / G / T 表記
+    function toSI(n) {
+      if (n >= 1_000_000_000_000) return (n / 1_000_000_000_000).toFixed(1) + ' T';
+      if (n >= 1_000_000_000)     return (n / 1_000_000_000).toFixed(1)     + ' G';
+      if (n >= 1_000_000)         return (n / 1_000_000).toFixed(1)         + ' M';
+      return                             (n / 1_000).toFixed(1)              + ' K';
+    }
+
+    // ヒント（カンマ数＋上位桁数）
+    function toHint(n) {
+      const s      = formatComma(n);
+      const commas = (s.match(/,/g) || []).length;
+      const lead   = s.split(',')[0].length;
+      const unit   = commas === 4 ? 'T（テラ）＝一兆単位'
+                   : commas === 3 ? 'G（ギガ）＝十億単位'
+                   : commas === 2 ? 'M（メガ）＝百万単位'
+                   :                'K（キロ）＝千単位';
+      return `💡 カンマが${commas}つ・上位${lead}桁 → ${unit}`;
+    }
+
+    // ── クリックハンドラ ──────────────────────
+    function handleClick() {
+      if (state === 'done')                    { showGoal(); }
+      else if (state === 'idle' ||
+               state === 'revealed')           { startQuestion(); }
+      // showing 中は無視
+    }
+
+    // ── 問題開始 ──────────────────────────────
+    function startQuestion() {
+      clearInterval(countdownTimer);
+
+      const n = randomNumber();
+      currentJa   = toJapanese(n);
+      currentSi   = toSI(n);
+      currentHint = toHint(n);
+
+      const formatted = formatComma(n);
+      hideSplash();
+      adjustFontSize(formatted);
+      document.getElementById('counter').textContent =
+        `${answered + 1} / ${TOTAL}`;
+      document.getElementById('number-display').textContent = formatted;
+      document.getElementById('answer-ja').textContent = '';
+      document.getElementById('answer-si').textContent = '';
+      document.getElementById('answer-area').classList.remove('visible');
+      document.getElementById('hint-text').textContent = '';
+      document.getElementById('hint-text').classList.remove('visible');
+      document.getElementById('hint').textContent = 'タップで次の問題へ';
+      document.getElementById('hint').style.opacity = '0';
+
+      let sec = 3;
+      updateCountdown(sec);
+      state = 'showing';
+
+      countdownTimer = setInterval(() => {
+        sec--;
+        if (sec > 0) { updateCountdown(sec); }
+        else         { clearInterval(countdownTimer); revealAnswer(); }
+      }, 1000);
+    }
+
+    function updateCountdown(sec) {
+      const dots = Array.from({length: 3}, (_, i) =>
+        `<span class="dot ${i < (3 - sec) ? 'active' : ''}"></span>`
+      ).join('');
+      document.getElementById('countdown').innerHTML =
+        `あと ${sec} 秒で答えを表示　${dots}`;
+    }
+
+    // ── 答え表示 ──────────────────────────────
+    function revealAnswer() {
+      answered++;
+      document.getElementById('countdown').textContent = '';
+      document.getElementById('answer-ja').textContent = currentJa;
+      document.getElementById('answer-si').textContent = currentSi;
+      document.getElementById('answer-area').classList.add('visible');
+      document.getElementById('hint-text').textContent = currentHint;
+      document.getElementById('hint-text').classList.add('visible');
+
+      if (answered >= TOTAL) {
+        document.getElementById('hint').textContent = 'タップで完了';
+        state = 'done';
+      } else {
+        state = 'revealed';
+      }
+      document.getElementById('hint').style.opacity = '1';
+    }
+
+    // ── ゴール画面 ────────────────────────────
+    function showGoal() {
+      document.getElementById('quiz-ui').style.display = 'none';
+      document.getElementById('goal').style.display = 'flex';
+    }
+
+    function resetQuiz(e) {
+      e.stopPropagation();
+      answered = 0; lastDigits = 0;
+      document.getElementById('goal').style.display = 'none';
+      document.getElementById('quiz-ui').style.display = 'block';
+      state = 'idle';
+      startQuestion();
+    }
+
+    function hideSplash() {
+      const s = document.getElementById('start-msg');
+      if (s) s.remove();
+    }
+  </script>
+</body>
+</html>
