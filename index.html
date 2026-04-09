@@ -258,10 +258,18 @@
       const s      = formatComma(n);
       const commas = (s.match(/,/g) || []).length;
       const lead   = s.split(',')[0].length;
-      const unit   = commas === 4 ? 'T（テラ）＝一兆単位'
-                   : commas === 3 ? 'G（ギガ）＝十億単位'
-                   : commas === 2 ? 'M（メガ）＝百万単位'
-                   :                'K（キロ）＝千単位';
+      const unitMap = {
+        '4-1': 'T（テラ）＝兆単位',
+        '3-1': 'G（ギガ）＝十億単位',
+        '3-2': 'G（ギガ）＝百億単位',
+        '3-3': 'G（ギガ）＝千億単位',
+        '2-1': 'M（メガ）＝百万単位',
+        '2-2': 'M（メガ）＝千万単位',
+        '2-3': 'M（メガ）＝億単位',
+        '1-2': 'K（キロ）＝万単位',
+        '1-3': 'K（キロ）＝十万単位',
+      };
+      const unit = unitMap[`${commas}-${lead}`] || '';
       return `💡 カンマが${commas}つ・上位${lead}桁 → ${unit}`;
     }
 
