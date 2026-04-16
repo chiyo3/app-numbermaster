@@ -200,10 +200,14 @@
 
     // ── 数値生成 ──────────────────────────────
     function randomNumber() {
-      // 5〜13桁を均等に選んでから、その桁の範囲で乱数生成
+      // 60% の確率で 5〜9桁（10億以下）、40% で 10〜13桁
       let digits, n;
       do {
-        digits = Math.floor(Math.random() * 9) + 5; // 5〜13桁
+        if (Math.random() < 0.6) {
+          digits = Math.floor(Math.random() * 5) + 5;  // 5〜9桁
+        } else {
+          digits = Math.floor(Math.random() * 4) + 10; // 10〜13桁
+        }
         const min = Math.pow(10, digits - 1);
         const max = digits === 13
           ? 9_000_000_000_000        // 上限 9兆
